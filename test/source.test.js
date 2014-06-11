@@ -3,6 +3,7 @@ var fs = require('fs');
 var path = require('path');
 var assert = require('assert');
 var tm = require('../lib/tm');
+var yaml = require('js-yaml');
 var source = require('../lib/source');
 var tilelive = require('tilelive');
 var mockOauth = require('../lib/mapbox-mock')(require('express')());
@@ -227,16 +228,17 @@ describe('source local', function() {
             assert.ifError(err);
             assert.ok(source);
 
-            var datayml = fs.readFileSync(tmpPerm + '/data.yml', 'utf8').replace(__dirname,'[basepath]');
             var dataxml = fs.readFileSync(tmpPerm + '/data.xml', 'utf8').replace(__dirname,'[basepath]');
-
-            if (UPDATE) {
-                fs.writeFileSync(__dirname + '/expected/source-save-data.yml', datayml);
-                fs.writeFileSync(__dirname + '/expected/source-save-data.xml', dataxml);
-            }
-
-            assert.equal(datayml, fs.readFileSync(__dirname + '/expected/source-save-data.yml'));
+            if (UPDATE) fs.writeFileSync(__dirname + '/expected/source-save-data.xml', dataxml);
             assert.equal(dataxml, fs.readFileSync(__dirname + '/expected/source-save-data.xml'));
+
+            // Use a deepEqual comparison of parsed yaml.
+            // This is because the `file` attribute can be very different in
+            // the yaml format depending on whether we are on windows or unix.
+            var datayml = yaml.load(fs.readFileSync(tmpPerm + '/data.yml', 'utf8'));
+            datayml.Layer[0].Datasource.file = datayml.Layer[0].Datasource.file.replace(__dirname,'[basepath]');
+            if (UPDATE) fs.writeFileSync(__dirname + '/expected/source-save-data.yml', yaml.dump(datayml));
+            assert.deepEqual(datayml, yaml.load(fs.readFileSync(__dirname + '/expected/source-save-data.yml', 'utf8')));
 
             // This setTimeout is here because thumbnail generation on save
             // is an optimistic operation (e.g. callback does not wait for it
